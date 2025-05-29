@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
             <StatusCard 
               title="Deployment Status"
               status="success"
-              message="Congratulations Build and Deployment of React Application is Successfull using Kubernetes"
+              message="Congratulations Build and Deployment of React Application is Successfull using Jenkins"
               timestamp={new Date().toLocaleString()}
             />
           </FadeIn>
