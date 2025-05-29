@@ -1,195 +1,220 @@
-# 🚀 Deploy React App Using MicroK8s on AWS EC2
+# Jenkins Build and Deploy – React Application on EC2
 
-This guide walks you through deploying a React application using MicroK8s (a lightweight Kubernetes distribution) on an AWS EC2 instance.
+This guide explains how to set up a Jenkins pipeline to **automatically build and deploy a React application** whenever code is pushed to a GitHub repository.
 
+We will:
 
-## 📦 Setting Up MicroK8s on AWS EC2
+- Set up Jenkins on an AWS EC2 server.
+- Configure SSH between Jenkins and a build server.
+- Create a Jenkins pipeline that uses `build.sh` and `deploy.sh`.
+- Trigger deployments on every GitHub push via webhook.
 
-We are using **MicroK8s** as a lightweight alternative to full Kubernetes for this project.
+---
 
-### 🛠 Install MicroK8s
+## 🧰 Prerequisites
+
+- Two AWS EC2 Ubuntu instances:
+  - **Jenkins Server**
+  - **Deploy Server (Build and Deployment target)**
+- React app repository with `build.sh` and `deploy.sh` scripts.
+- GitHub repository (public or authenticated).
+
+---
+
+## 🔧 Step-by-Step Setup
+
+### 1. Install Java on Jenkins Server
 
 ```bash
-sudo snap install microk8s --classic
-sudo usermod -a -G microk8s ubuntu
-mkdir ~/.kube
-sudo microk8s kubectl config view --raw > ~/.kube/config
-
-# Sign out and sign in again
-sudo su - root
-sudo su - ubuntu
-
-microk8s kubectl get all --all-namespaces
-alias kubectl="microk8s kubectl"
+sudo apt update
+sudo apt install fontconfig openjdk-17-jre
+java -version
 ````
 
 ---
 
-## 🚧 Kubernetes Deployment of React App
-
-We will create the following manifest files:
-
-* `react-deployment.yaml`
-* `react-service.yaml`
-* `react-ingress.yaml`
-
----
-
-## ✅ Step 1: Create Namespace
+### 2. Install Jenkins
 
 ```bash
-kubectl create ns react-microk8s
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+  https://pkg.jenkins.io/debian-stable binary/" | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install jenkins
 ```
 
 ---
 
-## 📄 Step 2: Deployment Manifest
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: react-deployment
-  namespace: react-microk8s
-  labels:
-    app: react-demo
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: react-demo
-  template:
-    metadata:
-      labels:
-        app: react-demo
-    spec:
-      containers:
-        - name: react-demo
-          image: sagarkakkalasworld/kubernetes-deployment
-          ports:
-            - containerPort: 80
-```
-
-If using a specific tag:
-
-```yaml
-image: sagarkakkalasworld/kubernetes-deployment:1.2
-```
-
-Apply the deployment:
+### 3. Start Jenkins
 
 ```bash
-kubectl apply -f react-deployment.yaml
-kubectl get pods -n react-microk8s
+sudo systemctl enable jenkins
+sudo systemctl start jenkins
+sudo systemctl status jenkins
 ```
+
+> Jenkins runs on **port 8080**. Add port 8080 to EC2 security group inbound rules.
+
+Access Jenkins at: `http://<AWS_PUBLIC_IP>:8080`
 
 ---
 
-## 📄 Step 3: Service Manifest
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: react-service
-  namespace: react-microk8s
-spec:
-  type: NodePort  # remove this if using domain
-  selector:
-    app: react-demo
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-      nodePort: 32720  # remove this if using domain
-```
-
-Apply the service:
+### 4. Unlock Jenkins
 
 ```bash
-kubectl apply -f react-service.yaml
-kubectl get svc -n react-microk8s
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
-Test service internally:
+* Paste the password on the Jenkins web UI.
+* Install suggested plugins.
+* Create your admin user.
+
+---
+
+### 5. Connect Agent server to Deploy server Server (SSH)
 
 ```bash
-curl http://<CLUSTER-IP>:80
+ssh-keygen
 ```
 
----
+* Copy the contents of `/home/ubuntu/.ssh/id_rsa.pub`
+* Paste into `/home/ubuntu/.ssh/authorized_keys` on the Demo Server.
 
-## 🌐 Step 4: Enable and Configure Ingress
+Test connection:
 
 ```bash
-microk8s enable ingress
-kubectl get all --all-namespaces
+ssh ubuntu@<DeployServer_Private_IP>
+exit
 ```
 
 ---
 
-## 📄 Step 5: Ingress Manifest
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: react-ingress
-  namespace: react-microk8s
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-    - host: sagarkakkala.shop
-      http:
-        paths:
-          - pathType: Prefix
-            path: /
-            backend:
-              service:
-                name: react-service
-                port:
-                  number: 80
-```
-
-Apply the ingress:
+### 6. Install Java on Agent (Demo Server)
 
 ```bash
-kubectl apply -f react-ingress.yaml
-kubectl get ingress -n react-microk8s
+sudo apt update
+sudo apt install fontconfig openjdk-17-jre
+java -version
 ```
 
-Test site inside server:
+---
+
+### 7. Configure Jenkins Agent (Slave)
 
 ```bash
-curl http://sagarkakkala.shop
+curl -sO http://<JENKINS_PUBLIC_IP>:8080/jnlpJars/agent.jar
+
+java -jar agent.jar -url http://<JENKINS_PUBLIC_IP>:8080/ \
+  -secret <YOUR_SECRET> -name slave -webSocket -workDir "/opt/build/"
 ```
 
 ---
 
-## 🌍 Domain and Port Access
+## 🛠 Jenkinsfile for React App Build & Deploy
 
-1. Allow port **80** in EC2 Security Group.
-2. Copy your AWS EC2 **Public IP**.
-3. Go to GoDaddy Dashboard → My Products → Domain → DNS.
-4. Edit the **A Record** and set your EC2 public IP.
-5. Access your app at: **[http://sagarkakkala.shop](http://sagarkakkala.shop)**
+Place this in your **React app repo** root:
 
-**Note:** EC2 public IP changes after instance restart. To make it static, use **Elastic IP** (may incur cost).
+```groovy
+pipeline {
+    agent { label 'slave' } // Replace 'slave' with your actual node label
+
+    environment {
+        AWS_PRIVATE_IP = '172.31.30.63' // Define the private IP address here
+    }
+
+    stages {
+        stage('Clean up and clone') {
+            steps {
+                script {
+                    sh """
+                        ssh ubuntu@${AWS_PRIVATE_IP} 'rm -rf /home/ubuntu/Udemy-section*'
+                        ssh ubuntu@${AWS_PRIVATE_IP} 'git clone https://github.com/sagarkakkalasworld/Udemy-section4.git'
+                    """
+                }
+            }
+        }
+
+        stage('Set Script Permissions') {
+            steps {
+                script {
+                    sh """
+                        ssh ubuntu@${AWS_PRIVATE_IP} 'chmod 744 /home/ubuntu/Udemy-section4/build.sh'
+                        ssh ubuntu@${AWS_PRIVATE_IP} 'chmod 744 /home/ubuntu/Udemy-section4/deploy.sh'
+                    """
+                }
+            }
+        }
+
+        stage('Build React code') {
+            steps {
+                script {
+                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4-code/build.sh'"
+                }
+            }
+        }
+
+        stage('Deploy in nginx') {
+            steps {
+                script {
+                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4-code/deploy.sh'"
+                }
+            }
+        }
+    }
+}
+
+```
 
 ---
 
-## 🎥 Build & Deploy Complete Series
+## 🚀 Create Pipeline in Jenkins
 
-👉 [Visit Sagar Kakkala's World](https://www.sagarkakkalasworld.com)
+1. Jenkins → New Item → Enter name → Select **"Pipeline"**
+2. Check **GitHub hook trigger for Git SCM polling**
+3. Under "Pipeline from SCM":
+
+   * Choose Git
+   * Enter GitHub repo URL
+   * Leave credentials as "None" (for public repos)
+   * Branch: `main`
+   * Script Path: `Jenkinsfile`
+4. Apply → Save → **Build Now**
 
 ---
 
-## 🤝 Connect with Me
+## 🔁 Setup GitHub Webhook
 
-* 📺 [YouTube - Sagar Kakkala's World](https://www.youtube.com/@SagarKakkalasWorld)
-* 💼 [LinkedIn - Sagar Kakkala](https://www.linkedin.com/in/sagar-kakkala)
+1. Go to GitHub Repo → **Settings** → **Webhooks** → Add Webhook
+2. Payload URL: `http://<JENKINS_PUBLIC_IP>:8080/github-webhook/`
+3. Content type: `application/json`
+4. Event: **Just the push event**
+5. Click **Add Webhook**
 
 ---
 
-🖊 *Feedback, queries, and suggestions are welcome in the comments!*
+## ✅ Verify
+
+Push a change to the repo and observe:
+
+* Jenkins triggers a new pipeline run
+* Console logs are visible under Build → Console Output
+* Your app is rebuilt and deployed automatically 🎉
+
+---
+
+## 🔗 Connect with Me
+
+I share content on:
+
+* 🚀 DevOps
+* 🎬 Vlogs
+* 🧳 Travel stories
+* 🎤 Contrafactums
+
+👉 [Sagar Kakkala One Stop](https://linktr.ee/sagar_kakkalas_world)
+
+Feel free to share feedback, queries, or suggestions in the comments!
