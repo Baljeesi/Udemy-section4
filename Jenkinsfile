@@ -31,7 +31,7 @@ pipeline {
         stage('Build React code') {
             steps {
                 script {
-                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4-code/build.sh'"
+                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4/build.sh'"
                 }
             }
         }
@@ -39,7 +39,7 @@ pipeline {
         stage('Deploy in nginx') {
             steps {
                 script {
-                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4-code/deploy.sh'"
+                    sh "ssh ubuntu@${AWS_PRIVATE_IP} '/home/ubuntu/Udemy-section4/deploy.sh'"
                 }
             }
         }
