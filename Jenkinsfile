@@ -2,7 +2,7 @@ pipeline {
     agent { label 'slave' } // Replace 'slave' with your actual node label
 
     environment {
-        AWS_PRIVATE_IP = '172.31.30.63' // Define the private IP address here
+        AWS_PRIVATE_IP = '172.31.31.45' // Define the private IP address here
     }
 
     stages {
