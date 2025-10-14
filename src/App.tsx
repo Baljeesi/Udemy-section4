@@ -5,7 +5,7 @@ import './index.css';
 function App() {
   // Title update
   React.useEffect(() => {
-    document.title = "CI/CD Dashboard - Sagar Kakkala";
+    document.title = "CI/CD Dashboard - Baljeet Singh";
   }, []);
 
   return (
