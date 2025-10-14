@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center">
         <div className="mb-4 md:mb-0">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            © 2025 Sagar Kakkala. CI/CD Platform.
+            © 2025 Baljeet Singh. CI/CD Platform.
           </p>
         </div>
         <div className="flex space-x-4">
