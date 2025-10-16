@@ -2,7 +2,7 @@ pipeline {
     agent { label 'slave' } // Replace 'slave' with your actual node label
 
     environment {
-        AWS_PRIVATE_IP = '172.31.31.45' // Define the private IP address here
+        AWS_PRIVATE_IP = '172.31.16.247' // Define the private IP address here
     }
 
     stages {
@@ -11,7 +11,7 @@ pipeline {
                 script {
                     sh """
                         ssh ubuntu@${AWS_PRIVATE_IP} 'rm -rf /home/ubuntu/Udemy-section*'
-                        ssh ubuntu@${AWS_PRIVATE_IP} 'git clone https://github.com/sagarkakkalasworld/Udemy-section4.git'
+                        ssh ubuntu@${AWS_PRIVATE_IP} 'git clone https://github.com/baljeesi/Udemy-section4.git'
                     """
                 }
             }
